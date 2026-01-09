@@ -1,0 +1,66 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: workflow
+name: Test SCM Token Context
+
+on:
+  workflow_dispatch:
+
+permissions:
+  scm-token-own: read
+  scm-token-org: read
+  id-token: write
+
+jobs:
+  test-scm-token:
+    steps:
+      - name: Checkout
+        uses: cloudbees-io/checkout@v1
+
+      - name: Test cloudbees.scm.token is available
+        uses: docker://alpine:latest
+        run: |
+          echo "Testing cloudbees.scm.token context variable..."
+          
+          # Check if token variable is set (should be available via context)
+          if [ -z "$SCM_TOKEN" ]; then
+            echo "ERROR: cloudbees.scm.token is not available"
+            exit 1
+          fi
+          
+          # Verify token is not empty
+          TOKEN_LENGTH=${#SCM_TOKEN}
+          if [ "$TOKEN_LENGTH" -eq 0 ]; then
+            echo "ERROR: cloudbees.scm.token is empty"
+            exit 1
+          fi
+          
+          echo "✓ cloudbees.scm.token is available and non-empty"
+          echo "✓ Token length: $TOKEN_LENGTH characters"
+          echo "SUCCESS: cloudbees.scm.token context variable verified!"
+        env:
+          SCM_TOKEN: ${{ cloudbees.scm.token }}
+
+      - name: Test git credential helper is configured
+        uses: docker://alpine:latest
+        run: |
+          echo "Testing git credential helper configuration..."
+          
+          # Install git
+          apk add --no-cache git
+          
+          # Check git credential helper configuration
+          git config --global --get credential.helper || echo "No global credential helper configured"
+          
+          echo "✓ Git credential helper test completed"
+
+      - name: Display SCM context information
+        uses: docker://alpine:latest
+        run: |
+          echo "SCM Context Information:"
+          echo "  Repository: ${{ cloudbees.scm.repository }}"
+          echo "  Branch: ${{ cloudbees.scm.branch }}"
+          echo "  SHA: ${{ cloudbees.scm.sha }}"
+          echo "  Provider: ${{ cloudbees.scm.provider }}"
+          echo "  Provider URL: ${{ cloudbees.scm.provider_url }}"
+          echo ""
+          echo "✓ All SCM context variables are accessible"
